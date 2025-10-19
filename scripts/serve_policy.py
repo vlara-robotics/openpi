@@ -7,7 +7,7 @@ import tyro
 
 from openpi.policies import policy as _policy
 from openpi.policies import policy_config as _policy_config
-from openpi.serving import websocket_policy_server
+from openpi.serving import websocket_policy_server_json
 from openpi.training import config as _config
 
 
@@ -108,7 +108,7 @@ def main(args: Args) -> None:
     local_ip = socket.gethostbyname(hostname)
     logging.info("Creating server (host: %s, ip: %s)", hostname, local_ip)
 
-    server = websocket_policy_server.WebsocketPolicyServer(
+    server = websocket_policy_server_json.WebsocketPolicyServerJSON(
         policy=policy,
         host="0.0.0.0",
         port=args.port,
