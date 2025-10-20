@@ -101,7 +101,7 @@ class WebsocketPolicyServerJSON:
         processed = {}
 
         for key, value in obs.items():
-            if key.endswith('_image') and isinstance(value, str):
+            if isinstance(value, str):
                 # Decode base64 image data
                 try:
                     image_data = base64.b64decode(value)
