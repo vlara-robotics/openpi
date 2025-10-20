@@ -69,6 +69,17 @@ const url = `wss://${hostname}:${port}`;
   ws.on('message', (data) => {
     try {
       const response = JSON.parse(data);
+
+      // Check if this is an error response
+      if (response.type === 'error') {
+        console.error('=== SERVER ERROR ===');
+        console.error('Message:', response.message);
+        console.error('Full traceback:');
+        console.error(response.traceback);
+        console.error('===================');
+        return;
+      }
+
       console.log('Received response:', JSON.stringify(response, null, 2));
 
       if (response.actions && Array.isArray(response.actions)) {
