@@ -1,6 +1,7 @@
 const fs = require('fs');
 const WebSocket = require('ws');
 const sharp = require('sharp');
+const readline = require('readline');
 
 // Update these as needed
 const imagePath = './twotwentyfour.png';
@@ -8,22 +9,28 @@ const hostname = '4d4u3mlbph57lw-8000.proxy.runpod.net';
 const port = '443';
 const url = `wss://${hostname}:${port}`;
 
+// Setup readline for keyboard input
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
 (async () => {
   let base64Image;
   try {
-    // Load image with sharp, resize to 224x224 if not already, get raw RGB (HWC)
+    // Load image with sharp, resize to 224x224, ensure RGB only (no alpha channel)
     const image = sharp(imagePath);
-    const metadata = await image.metadata();
     const buffer = await image
       .resize(224, 224)
+      .removeAlpha()  // Remove alpha channel to ensure RGB-only (3 channels)
       .raw()
       .toBuffer();
 
-    // buffer is Uint8Array of HWC (224*224*3 bytes)
+    // buffer is Uint8Array of HWC (224*224*3 = 150,528 bytes)
     const pixels = new Uint8Array(buffer);
     const chw = new Uint8Array(224 * 224 * 3);
 
-    // Transpose HWC to CHW
+    // Transpose HWC to CHW (required by server)
     let idx = 0;
     for (let c = 0; c < 3; c++) {
       for (let h = 0; h < 224; h++) {
@@ -33,7 +40,9 @@ const url = `wss://${hostname}:${port}`;
       }
     }
 
+    // Send the CHW-formatted data (3, 224, 224)
     base64Image = Buffer.from(chw).toString('base64');
+
   } catch (err) {
     console.error('Error processing image:', err);
     process.exit(1);
@@ -43,6 +52,14 @@ const url = `wss://${hostname}:${port}`;
 
   ws.on('open', () => {
     console.log('WebSocket connection established');
+    console.log('Press Enter to close connection...');
+
+    // Listen for Enter key to close connection
+    rl.on('line', () => {
+      console.log('Closing WebSocket connection...');
+      ws.close();
+      rl.close();
+    });
 
     // Send observations at a rate of every 1 second
     const interval = setInterval(() => {
