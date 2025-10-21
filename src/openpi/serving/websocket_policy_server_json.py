@@ -14,6 +14,14 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles numpy arrays by converting them to lists."""
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
 class WebsocketPolicyServerJSON:
     """Serves a policy using the websocket protocol with JSON communication.
 
@@ -76,8 +84,8 @@ class WebsocketPolicyServerJSON:
                     # We can only record the last total time since we also want to include the send time.
                     action["server_timing"]["prev_total_ms"] = prev_total_time * 1000
 
-                # Send response as JSON
-                await websocket.send(json.dumps(action))
+                # Send response as JSON using NumpyEncoder to handle numpy arrays
+                await websocket.send(json.dumps(action, cls=NumpyEncoder))
                 prev_total_time = time.monotonic() - start_time
 
             except websockets.ConnectionClosed:
@@ -97,11 +105,11 @@ class WebsocketPolicyServerJSON:
                 raise
 
     def _process_observation(self, obs: dict) -> dict:
-        """Convert base64-encoded images to numpy arrays."""
+        """Convert base64-encoded images to numpy arrays and handle numeric lists."""
         processed = {}
 
         for key, value in obs.items():
-            if isinstance(value, str):
+            if 'image' in key and isinstance(value, str):
                 # Decode base64 image data
                 try:
                     image_data = base64.b64decode(value)
@@ -114,8 +122,14 @@ class WebsocketPolicyServerJSON:
                 except Exception as e:
                     logger.error(f"Failed to decode image {key}: {e}")
                     raise ValueError(f"Invalid base64 image data for {key}")
+            elif isinstance(value, list):
+                # Convert numeric lists to numpy arrays
+                processed[key] = np.array(value)
+            elif isinstance(value, dict):
+                # Recursively handle nested dicts
+                processed[key] = self._process_observation(value)
             else:
-                # Keep other fields as-is
+                # Keep other fields as-is (numbers, strings, etc.)
                 processed[key] = value
 
         return processed
